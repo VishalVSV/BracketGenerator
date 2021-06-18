@@ -1,0 +1,249 @@
+<html>
+    <head>
+        <script>
+            var mydragg = function(){
+                return {
+                    move : function(divid,xpos,ypos){
+                        divid.style.left = xpos + 'px';
+                        divid.style.top = ypos + 'px';
+                    },
+                    startMoving : function(divid,container,evt){
+                        evt = evt || window.event;
+                        var posX = evt.clientX,
+                            posY = evt.clientY,
+                        divTop = divid.style.top,
+                        divLeft = divid.style.left,
+						eWi = parseInt(divid.style.width),
+						eHe = parseInt(divid.style.height),
+						cWi = parseInt(document.getElementById(container).style.width),
+						cHe = parseInt(document.getElementById(container).style.height);
+						document.getElementById(container).style.cursor='move';
+                        divTop = divTop.replace('px','');
+                        divLeft = divLeft.replace('px','');
+                        var diffX = posX - divLeft,
+                            diffY = posY - divTop;
+                        document.onmousemove = function(evt){
+                            evt = evt || window.event;
+                            var posX = evt.clientX,
+                                posY = evt.clientY,
+                                aX = posX - diffX,
+                                aY = posY - diffY;
+								if (aX < 0) aX = 0;
+								if (aY < 0) aY = 0;
+								if (aX + eWi > cWi) aX = cWi - eWi;
+								if (aY + eHe > cHe) aY = cHe -eHe;
+                            mydragg.move(divid,aX,aY);
+                        }
+                    },
+                    stopMoving : function(container){
+                        var a = document.createElement('script');
+						document.getElementById(container).style.cursor='default';
+                        document.onmousemove = function(){}
+                    },
+                }
+            }();
+
+        </script>
+        <style>
+            .bracket {
+                display: flex;
+                flex-direction: row;
+                width: fit-content;
+                overflow: hidden;
+            }
+
+            .round {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                list-style: none;
+                padding: 0;
+                width: 200px;
+            }
+
+            .round .spacer {
+                flex-grow: 1;
+            }
+
+            .round .spacer:first-child, .round .spacer:last-child {
+                flex-grow: 0.5;
+            }
+
+            li.game {
+                padding-left:20px;
+            }
+
+            li.game.editable {
+                padding-left: 10px;
+                padding-bottom: 2px;
+            }
+
+            li.game.winner{
+                font-weight:bold;
+            }
+            li.game span{
+                float:right;
+                margin-right:5px;
+
+                font-size: 0.7em;
+                margin-top: 5px;
+            }
+
+            li.game-top{ border-bottom:1px solid #aaa; }
+
+            li.game-spacer{ 
+                border-right:1px solid #aaa;
+                min-height:40px;
+                flex-grow: 1;
+            }
+
+            li.game-bottom{ 
+                border-top:1px solid #aaa;
+            }
+
+            .input_name {
+                float: left;
+            }
+        </style>
+        <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    </head>
+    <body id="container">
+        <div id="bracket">
+        </div>
+        <div style="float: right;padding-right: 50px;width: 12%;background-color: lightcyan;position: absolute;" id="toolbox" onmousedown='mydragg.startMoving(this,"container",event);' onmouseup='mydragg.stopMoving("container");'>
+            <h1 style="align-content: center;">Toolbox</h1>
+            
+            <label style="white-space:nowrap;">Depth: <input type="number" id="depth" value=3></label>
+            <label style="white-space:nowrap;">Spacing: <input type="number" id="spacing" value=1></label>
+
+            <button onclick="generateBracket(document.getElementById('depth').value,document.getElementById('spacing').value);">Generate Bracket</button>
+            <button onclick="completeBracket();">Complete Bracket</button>
+            <button onclick="editBracket();">Edit Bracket</button>
+            <button onclick="draw()">Download bracket image</button>
+        </div>
+        <!-- <img id="test"> -->
+        <script>
+            function draw() {
+                var div = document.getElementsByClassName("bracket")[0];
+                html2canvas(div, { scale:3 }).then(function(canvas) {
+                    // document.getElementById("test").src = canvas.toDataURL();
+                    resizeUrl(canvas.toDataURL(), 1920, 1080).then(function(url) {downloadImg(url)});  // by default png
+                });
+            }
+
+            function downloadImg(img) {
+                var a = document.createElement("a");
+                a.href = img;
+                a.download = "bracket.png";
+                a.click();
+            }
+            
+            document.getElementById("toolbox").style.left = window.innerWidth - document.getElementById("toolbox").clientWidth;
+
+            function completeBracket() {
+                var text_boxes = document.getElementsByClassName("input_name");
+
+                while(text_boxes.length > 0) {
+
+                    var winner = false;
+                    var node = text_boxes[0].parentElement.querySelectorAll("input[type=\"checkbox\"")[0];
+                    if(node != null) {
+                        if(node.checked) {
+                            text_boxes[0].parentElement.parentElement.classList.add("winner");
+                            winner = true;
+                        }
+                    }
+                    else {
+                        winner = true;
+                        text_boxes[0].parentElement.classList.add("winner");
+                    }
+
+                    text_boxes[0].parentElement.innerHTML = text_boxes[0].value.toString() + (text_boxes[0].value.toString().trim() != "" ? "<span>"+ (winner ? "Winner" : "") +"</span>" : "");
+                }
+            }
+
+            function editBracket() {
+                var text_boxes = document.querySelectorAll(".game-bottom, .game-top");
+
+                for (let i = 0; i < text_boxes.length; i++) {
+                    const element = text_boxes[i];
+                    var checked = "";
+                    if (element.classList.contains("winner")) {
+                        checked = "checked";
+                    }
+                    element.innerHTML = '<div><input type="text" class="input_name" value="'+element.firstChild.innerHTML+'"><input type="checkbox" '+checked.toString()+'></div>';
+                }
+            }
+
+            function generateBracket(depth, spacing) {
+                spacing = spacing || 1;
+
+                var bracket = document.getElementById("bracket");
+
+                var html = "";
+
+                html = '<div class="bracket col" style="float:left;">';
+
+                var i;
+                for (i = 0; i < depth; i++) {
+                    html += "<ul class=\"round\">";
+                    
+                    for(var l = 0; l < spacing;l++){
+                        html += '<li class="spacer">&nbsp;</li>';
+                    }
+
+                    console.log(Math.pow(2,depth - i));
+                    for (var j = 0; j < Math.pow(2,depth - i);j+=2) {
+                        html += '<li class="game game-top editable"><div><input type="text" class="input_name"><input type="checkbox"></div></li>';
+                        
+                        for(var l = 0; l < spacing;l++){
+                            html += '<li class="game game-spacer">&nbsp;</li>';
+                        }
+
+                        html += '<li class="game game-bottom editable"><div><input type="text" class="input_name"><input type="checkbox"></div></li>';
+                        for(var l = 0; l < spacing;l++){
+                            html += '<li class="spacer">&nbsp;</li>';
+                        }
+                    }
+
+                    html += '</ul>';
+                }
+
+                html += "<ul class=\"round\">";
+                    
+                for(var l = 0; l < spacing;l++){
+                    html += '<li class="spacer">&nbsp;</li>';
+                }
+                html += '<li class="game game-top editable"><div><input type="text" class="input_name"></div></li>';
+                for(var l = 0; l < spacing;l++){
+                    html += '<li class="spacer">&nbsp;</li>';
+                }
+
+                html += '</div>';
+
+                bracket.innerHTML = html;
+            }
+
+            function resizeUrl(url, width, height) {
+                return new Promise (function (resolved, rejected) {
+                    var i = new Image()
+                    i.onload = function(){
+                        var canvas = document.createElement("canvas");
+
+                        var aspect_ratio = i.width / i.height;
+
+                        var w = aspect_ratio * 1080;
+                        var h = 1080;
+
+                        canvas.width = w;
+                        canvas.height = h;
+                        canvas.getContext("2d").drawImage(i,0,0,i.width,i.height,0,0,w,h);
+
+                        resolved(canvas.toDataURL());
+                    };
+                    i.src = url;
+                });
+            }
+        </script>
+    </body>
+</html>
